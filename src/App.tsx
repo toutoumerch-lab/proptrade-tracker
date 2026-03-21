@@ -9,20 +9,33 @@ import AccountsPage from "@/pages/AccountsPage";
 import JournalPage  from "@/pages/JournalPage";
 import RiskPage     from "@/pages/RiskPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import AuthPage from "@/pages/AuthPage";
+import LandingPage from "@/pages/LandingPage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "./pages/NotFound.tsx";
+import { AuthProvider } from "@/context/AuthContext";
+
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={
+    <BrowserRouter>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/dashboard" element={
             <DashboardLayout>
               <OverviewPage />
+            </DashboardLayout>
+          } />
+          <Route path="/settings" element={
+            <DashboardLayout>
+              <SettingsPage />
             </DashboardLayout>
           } />
           <Route path="/accounts" element={
@@ -46,9 +59,10 @@ const App = () => (
             </DashboardLayout>
           } />
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+          </Routes>
+        </TooltipProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

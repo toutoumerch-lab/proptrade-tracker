@@ -1,10 +1,11 @@
 import { LayoutDashboard, Briefcase, BookOpen, ShieldAlert, BarChart3, Settings, LogOut, Zap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { label: "Overview",  to: "/",          icon: LayoutDashboard },
+  { label: "Overview",  to: "/dashboard", icon: LayoutDashboard },
   { label: "Accounts",  to: "/accounts",  icon: Briefcase },
   { label: "Journal",   to: "/journal",   icon: BookOpen },
   { label: "Risk",      to: "/risk",      icon: ShieldAlert },
@@ -17,6 +18,8 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed }: AppSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
   return (
     <aside
@@ -45,12 +48,12 @@ export function AppSidebar({ collapsed }: AppSidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-2 pt-4 space-y-0.5">
         {navItems.map(({ label, to, icon: Icon }) => {
-          const isActive = to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
+          const isActive = to === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(to);
           return (
             <NavLink
               key={to}
               to={to}
-              end={to === "/"}
+              end={to === "/dashboard"}
               className={cn(
                 "flex items-center gap-3 px-2.5 py-2 rounded text-sm font-medium transition-all duration-150",
                 "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -69,14 +72,14 @@ export function AppSidebar({ collapsed }: AppSidebarProps) {
       <div className="px-2 pb-4 space-y-0.5 border-t border-sidebar-border pt-3 mt-3">
         {!collapsed && (
           <>
-            <button className={cn(
+            <button onClick={() => navigate("/settings")} className={cn(
               "flex items-center gap-3 px-2.5 py-2 rounded text-sm font-medium w-full",
               "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
             )}>
               <Settings className="w-4 h-4 shrink-0" />
               <span>Settings</span>
             </button>
-            <button className={cn(
+            <button onClick={logout} className={cn(
               "flex items-center gap-3 px-2.5 py-2 rounded text-sm font-medium w-full",
               "text-loss/70 hover:text-loss hover:bg-loss/10 transition-colors"
             )}>
@@ -87,10 +90,10 @@ export function AppSidebar({ collapsed }: AppSidebarProps) {
         )}
         {collapsed && (
           <>
-            <button className="flex items-center justify-center w-10 h-9 mx-auto rounded text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
+            <button onClick={() => navigate("/settings")} className="flex items-center justify-center w-10 h-9 mx-auto rounded text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
               <Settings className="w-4 h-4" />
             </button>
-            <button className="flex items-center justify-center w-10 h-9 mx-auto rounded text-loss/70 hover:text-loss hover:bg-loss/10 transition-colors">
+            <button onClick={logout} className="flex items-center justify-center w-10 h-9 mx-auto rounded text-loss/70 hover:text-loss hover:bg-loss/10 transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
           </>

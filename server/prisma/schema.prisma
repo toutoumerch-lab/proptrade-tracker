@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("USER")
+  avatar       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  accounts     Account[]
+  alerts       Alert[]
+}
+
+model Account {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firmName           String
+  firmCode           String
+  firmColor          String   @default("#38bdf8")
+  phase              String   @default("Funded")
+  
+  balance            Float
+  dailyLimit         Float
+  totalDrawdownLimit Float
+  target             Float?
+
+  status             String   @default("ACTIVE") // ACTIVE, AT_RISK, BREACHED
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  trades             Trade[]
+}
+
+model Trade {
+  id           String   @id @default(uuid())
+  accountId    String
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  instrument   String
+  direction    String   // LONG, SHORT
+  outcome      String   // WIN, LOSS, OPEN
+  strategyTag  String?
+  session      String?
+  
+  entryPrice   Float
+  exitPrice    Float?
+  lots         Float
+  pnl          Float?
+  
+  openedAt     DateTime @default(now())
+  closedAt     DateTime?
+}
+
+model Alert {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   // CRITICAL, INFO, WARNING
+  title     String
+  message   String
+  
+  createdAt DateTime @default(now())
+}

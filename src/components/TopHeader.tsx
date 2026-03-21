@@ -1,5 +1,5 @@
 import { Bell, HelpCircle, PanelLeftClose, PanelLeftOpen, RefreshCw } from "lucide-react";
-import { mockUser } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
 
 interface TopHeaderProps {
   collapsed: boolean;
@@ -9,6 +9,10 @@ interface TopHeaderProps {
 }
 
 export function TopHeader({ collapsed, onToggle, activeLabel, subLabel }: TopHeaderProps) {
+  const { user } = useAuth();
+  const userName = user?.name || "Trader";
+  const userInitials = userName.substring(0, 2).toUpperCase();
+
   return (
     <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-surface shrink-0">
       <div className="flex items-center gap-3">
@@ -46,10 +50,10 @@ export function TopHeader({ collapsed, onToggle, activeLabel, subLabel }: TopHea
         <div className="h-4 w-px bg-border mx-1" />
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-2xs font-bold text-primary">
-            {mockUser.avatar}
+            {userInitials}
           </div>
           <div className="hidden sm:block">
-            <div className="text-xs font-semibold text-foreground leading-none">{mockUser.name}</div>
+            <div className="text-xs font-semibold text-foreground leading-none">{userName}</div>
             <div className="text-2xs text-muted-foreground mt-0.5">Switch Account</div>
           </div>
         </div>

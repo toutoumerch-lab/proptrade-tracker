@@ -2,43 +2,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { Download, TrendingUp, TrendingDown, ArrowUpRight, MoreVertical } from "lucide-react";
-import { mockSessionVolume, mockPropFirmMatrix } from "@/data/mockData";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAccounts, fetchTrades } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const metricCards = [
-  {
-    label: "Profit Factor",
-    value: "2.84",
-    sub: "Institutional Grade",
-    subClass: "text-profit",
-    border: "border-l-profit",
-    note: null,
-  },
-  {
-    label: "Win Rate",
-    value: "64.2%",
-    sub: "+4.1%",
-    subClass: "text-profit",
-    border: "border-l-caution",
-    bars: [true, true, true, true, false, false, false],
-  },
-  {
-    label: "Avg R:R Ratio",
-    value: "1:3.2",
-    sub: "Target 1:4.0",
-    subClass: "text-caution",
-    border: "border-l-primary",
-    note: "Optimizing Exit Strategy Recommended",
-  },
-  {
-    label: "Max Drawdown",
-    value: "3.18%",
-    sub: "Soft Cap: 5%",
-    subClass: "text-loss",
-    border: "border-l-loss",
-    note: "Daily Limit Remaining $4,820.00",
-  },
-];
 
 const statusBadgeMap: Record<string, string> = {
   HIGH_YIELD:     "badge-active",
@@ -70,6 +36,81 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function AnalyticsPage() {
+  const { data: accounts } = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
+  const { data: trades } = useQuery({ queryKey: ["trades"], queryFn: fetchTrades });
+
+  const tradesList = trades || [];
+  const accountsList = accounts || [];
+
+  // Metrics
+  const wins = tradesList.filter((t: any) => t.outcome === "WIN");
+  const losses = tradesList.filter((t: any) => t.outcome === "LOSS");
+  
+  const winRate = tradesList.length > 0 ? ((wins.length / tradesList.length) * 100).toFixed(1) + "%" : "0%";
+  
+  let grossProfit = 0;
+  let grossLoss = 0;
+  tradesList.forEach((t: any) => {
+    if (t.pnl > 0) grossProfit += t.pnl;
+    if (t.pnl < 0) grossLoss += Math.abs(t.pnl);
+  });
+  const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : (grossProfit > 0 ? "∞" : "0.00");
+
+  const avgWin = wins.length > 0 ? (grossProfit / wins.length) : 0;
+  const avgLoss = losses.length > 0 ? (grossLoss / losses.length) : 0;
+  const rrRatio = avgLoss > 0 ? `1:${(avgWin / avgLoss).toFixed(1)}` : (avgWin > 0 ? "1:∞" : "1:0");
+
+  let totalDrawdown = 0;
+  let totalDrawdownLimit = 0;
+  accountsList.forEach((acc: any) => {
+    totalDrawdown += (acc.currentDrawdown || 0);
+    totalDrawdownLimit += (acc.totalDrawdownLimit || 0);
+  });
+  const maxDrawdownPct = totalDrawdownLimit > 0 ? ((totalDrawdown / totalDrawdownLimit) * 100).toFixed(2) + "%" : "0%";
+
+  const dynamicMetricCards = [
+    { label: "Profit Factor", value: profitFactor, sub: "Calculated", subClass: "text-profit", border: "border-l-profit", note: null },
+    { label: "Win Rate", value: winRate, sub: `${wins.length} Wins`, subClass: "text-profit", border: "border-l-caution", bars: [true, true, true, false, false] },
+    { label: "Avg R:R Ratio", value: rrRatio, sub: "Dynamic", subClass: "text-caution", border: "border-l-primary", note: null },
+    { label: "Max Drawdown", value: maxDrawdownPct, sub: "Combined", subClass: "text-loss", border: "border-l-loss", note: null },
+  ];
+
+  // Session
+  const sessionData: any = {};
+  tradesList.forEach((t: any) => {
+    const s = t.session || "Unknown";
+    const date = new Date(t.openedAt).toLocaleDateString(undefined, { weekday: 'short' });
+    if (!sessionData[date]) sessionData[date] = { time: date, london: 0, newYork: 0, asian: 0, unknown: 0 };
+    if (s.toLowerCase().includes("london")) sessionData[date].london += Math.abs(t.pnl || 0);
+    else if (s.toLowerCase().includes("new york") || s.toLowerCase().includes("ny")) sessionData[date].newYork += Math.abs(t.pnl || 0);
+    else if (s.toLowerCase().includes("asian") || s.toLowerCase().includes("tokyo")) sessionData[date].asian += Math.abs(t.pnl || 0);
+    else sessionData[date].unknown += Math.abs(t.pnl || 0);
+  });
+  const sessionVolume = Object.values(sessionData);
+
+  // Best/Worst
+  const instrumentPnl: Record<string, number> = {};
+  tradesList.forEach((t: any) => {
+    instrumentPnl[t.instrument] = (instrumentPnl[t.instrument] || 0) + (t.pnl || 0);
+  });
+  let bestPerf = { instrument: "N/A", pnl: 0 };
+  let worstPerf = { instrument: "N/A", pnl: 0 };
+  Object.keys(instrumentPnl).forEach(k => {
+    if (instrumentPnl[k] > bestPerf.pnl || (bestPerf.instrument === "N/A" && instrumentPnl[k] > 0)) bestPerf = { instrument: k, pnl: instrumentPnl[k] };
+    if (instrumentPnl[k] < worstPerf.pnl || (worstPerf.instrument === "N/A" && instrumentPnl[k] < 0)) worstPerf = { instrument: k, pnl: instrumentPnl[k] };
+  });
+
+  // Matrix
+  const propFirmMatrix = accountsList.map((acc: any) => {
+    let accPnl = 0;
+    (acc.trades || []).forEach((t: any) => { if (t.pnl) accPnl += t.pnl; });
+    return {
+      code: acc.firmCode, name: acc.firmName, color: acc.firmColor || "#38bdf8",
+      totalPnl: accPnl, payoutFreq: "Bi-weekly", slippageAvg: 1.2,
+      status: acc.status === "BREACHED" ? "MONITORING" : (acc.status === "ACTIVE" ? "HIGH_YIELD" : "SCALING_READY")
+    };
+  });
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -108,7 +149,7 @@ export default function AnalyticsPage() {
 
       {/* Metric cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {metricCards.map(({ label, value, sub, subClass, border, bars, note }, i) => (
+        {dynamicMetricCards.map(({ label, value, sub, subClass, border, bars, note }: any, i) => (
           <div
             key={label}
             className={cn("card-surface rounded p-4 border-l-2 animate-fadeInUp", border)}
@@ -156,7 +197,8 @@ export default function AnalyticsPage() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={mockSessionVolume} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+            {sessionVolume.length > 0 ? (
+            <BarChart data={sessionVolume} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 18% 14%)" vertical={false} />
               <XAxis dataKey="time" tick={{ fill: "hsl(215 14% 45%)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "hsl(215 14% 45%)", fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -165,22 +207,29 @@ export default function AnalyticsPage() {
               <Bar dataKey="newYork" name="New York"  fill="#38bdf8" radius={[2,2,0,0]} maxBarSize={18} />
               <Bar dataKey="asian"   name="Asian"    fill="#f5a623" radius={[2,2,0,0]} maxBarSize={18} />
             </BarChart>
+            ) : (
+              <div className="flex w-full h-full items-center justify-center text-sm text-muted-foreground">Not enough data to model sessions.</div>
+            )}
           </ResponsiveContainer>
         </div>
 
         <div className="space-y-4">
           <div className="card-surface rounded p-4 animate-fadeInUp delay-350">
             <div className="metric-label mb-2">Best Performer</div>
-            <div className="text-2xl font-bold text-foreground font-mono">XAUUSD</div>
-            <div className="text-profit text-sm font-semibold mt-1">+$42,105.00 PnL</div>
+            <div className="text-2xl font-bold text-foreground font-mono">{bestPerf.instrument}</div>
+            <div className="text-profit text-sm font-semibold mt-1">
+              {bestPerf.pnl > 0 ? "+" : ""}${Math.abs(bestPerf.pnl).toLocaleString("en-US", { minimumFractionDigits: 2 })} PnL
+            </div>
             <div className="mt-3 w-10 h-10 rounded bg-profit/10 border border-profit/20 flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-profit" />
             </div>
           </div>
           <div className="card-surface rounded p-4 animate-fadeInUp delay-400">
             <div className="metric-label mb-2">Worst Performer</div>
-            <div className="text-2xl font-bold text-foreground font-mono">EURJPY</div>
-            <div className="text-loss text-sm font-semibold mt-1">-$8,420.00 PnL</div>
+            <div className="text-2xl font-bold text-foreground font-mono">{worstPerf.instrument}</div>
+            <div className="text-loss text-sm font-semibold mt-1">
+              {worstPerf.pnl > 0 ? "+" : ""}${Math.abs(worstPerf.pnl).toLocaleString("en-US", { minimumFractionDigits: 2 })} PnL
+            </div>
             <div className="mt-3 w-10 h-10 rounded bg-loss/10 border border-loss/20 flex items-center justify-center">
               <TrendingDown className="w-5 h-5 text-loss" />
             </div>
@@ -211,7 +260,7 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody>
-              {mockPropFirmMatrix.map((firm, i) => (
+              {propFirmMatrix.length > 0 ? propFirmMatrix.map((firm: any, i: number) => (
                 <tr key={firm.code} className="border-b border-border last:border-0 table-row-hover transition-colors"
                   style={{ animationDelay: `${i * 80 + 500}ms` }}
                 >
@@ -247,7 +296,13 @@ export default function AnalyticsPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground text-sm">
+                    No accounts tracked to compare performance yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

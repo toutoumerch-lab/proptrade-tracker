@@ -1,6 +1,8 @@
 import { CheckCircle2, AlertTriangle, XCircle, TrendingUp, Plus, Download, Copy } from "lucide-react";
 import { mockAccounts } from "@/data/mockData";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAccounts } from "@/lib/api";
 
 const statusConfig = {
   ACTIVE:   { label: "ACTIVE",   icon: CheckCircle2, cls: "badge-active",   iconClass: "text-profit" },
@@ -9,10 +11,14 @@ const statusConfig = {
 };
 
 export default function AccountsPage() {
-  const totalBuyingPower = mockAccounts.reduce((s, a) => s + a.balance, 0);
-  const totalProfit = 24102;
-  const avgDrawdown = 1.4;
-  const funded = mockAccounts.filter(a => a.status === "ACTIVE").length;
+  const { data, isLoading } = useQuery({ queryKey: ['accounts'], queryFn: fetchAccounts });
+
+  const accountsData = data || [];
+
+  const totalBuyingPower = accountsData.reduce((s: any, a: any) => s + Number(a.balance), 0);
+  const totalProfit = 0; // Aggregated on backend usually
+  const avgDrawdown = 0; // Aggregated on backend array sum
+  const funded = accountsData.filter((a: any) => a.status === "ACTIVE").length;
 
   return (
     <div className="space-y-5">
@@ -58,7 +64,7 @@ export default function AccountsPage() {
           <div className="flex items-center gap-2">
             <span className="badge-active text-2xs font-bold px-2 py-0.5 rounded">{funded} FUNDED</span>
             <span className="badge-risk text-2xs font-bold px-2 py-0.5 rounded">
-              {mockAccounts.filter(a => a.status !== "ACTIVE").length} CHALLENGES
+              {accountsData.filter(a => a.status !== "ACTIVE").length} CHALLENGES
             </span>
           </div>
         </div>
@@ -72,7 +78,7 @@ export default function AccountsPage() {
               </tr>
             </thead>
             <tbody>
-              {mockAccounts.map((acct, i) => {
+              {accountsData.map((acct, i) => {
                 const cfg = statusConfig[acct.status as keyof typeof statusConfig];
                 const drawPct = (acct.currentDrawdown / acct.totalDrawdown) * 100;
                 return (
